@@ -1,0 +1,194 @@
+### Variables
+@baseUrl = http://localhost:3000
+@userId = 
+@productId = 
+
+### ========== SETUP: Create a User First ==========
+
+### 1. Create User (Owner)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "John Seller",
+  "email": "john.seller@example.com",
+  "age": 35,
+  "tags": ["seller", "merchant"]
+}
+# Copy the "_id" from response and paste it in @userId variable above
+
+
+### ========== PRODUCTS CRUD ==========
+
+### 2. Create Product 1 (requires @userId)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Laptop",
+  "description": "High-performance laptop for developers",
+  "price": 1299.99,
+  "stock": 15,
+  "categories": ["electronics", "computers"],
+  "owner": "{{userId}}"
+}
+# Copy the "_id" from response and paste it in @productId variable above
+
+### 3. Create Product 2 (requires @userId)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Wireless Mouse",
+  "description": "Ergonomic wireless mouse",
+  "price": 29.99,
+  "stock": 50,
+  "categories": ["electronics", "accessories"],
+  "owner": "{{userId}}"
+}
+
+### 4. Create Product 3 - Different Category (requires @userId)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Office Chair",
+  "description": "Comfortable ergonomic office chair",
+  "price": 299.99,
+  "stock": 10,
+  "categories": ["furniture", "office"],
+  "owner": "{{userId}}"
+}
+
+### 5. Create Out of Stock Product (requires @userId)
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Gaming Keyboard",
+  "description": "Mechanical RGB gaming keyboard",
+  "price": 149.99,
+  "stock": 0,
+  "isAvailable": false,
+  "categories": ["electronics", "gaming"],
+  "owner": "{{userId}}"
+}
+
+
+### ========== READ OPERATIONS ==========
+
+### 6. Get All Products (with populated owner)
+GET {{baseUrl}}/products
+
+### 7. Get Product by ID (requires @productId)
+GET {{baseUrl}}/products/{{productId}}
+
+### 8. Get Products by Owner (requires @userId)
+GET {{baseUrl}}/products/owner/{{userId}}
+
+### 9. Get Available Products Only
+GET {{baseUrl}}/products/available
+
+### 10. Get Products by Category
+GET {{baseUrl}}/products/category/electronics
+
+### 11. Get Products by Price Range (min=0, max=100)
+GET {{baseUrl}}/products/price-range?min=0&max=100
+
+### 12. Get Products by Price Range (min=100, max=500)
+GET {{baseUrl}}/products/price-range?min=100&max=500
+
+
+### ========== UPDATE OPERATIONS ==========
+
+### 13. Update Product (requires @productId)
+PATCH {{baseUrl}}/products/{{productId}}
+Content-Type: application/json
+
+{
+  "price": 1199.99,
+  "description": "High-performance laptop for developers - SALE!",
+  "stock": 12
+}
+
+### 14. Update Stock Only (requires @productId)
+PATCH {{baseUrl}}/products/{{productId}}/stock
+Content-Type: application/json
+
+{
+  "quantity": 20
+}
+
+### 15. Mark Product as Unavailable
+PATCH {{baseUrl}}/products/{{productId}}
+Content-Type: application/json
+
+{
+  "isAvailable": false
+}
+
+
+### ========== DELETE OPERATIONS ==========
+
+### 16. Delete Product (requires @productId)
+DELETE {{baseUrl}}/products/{{productId}}
+
+
+### ========== ERROR TESTING ==========
+
+### 17. Create Product with Invalid Owner ID
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Test Product",
+  "description": "This should fail",
+  "price": 99.99,
+  "stock": 10,
+  "owner": "invalid-owner-id"
+}
+
+### 18. Create Product with Missing Required Fields
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Incomplete Product",
+  "price": 99.99
+}
+
+### 19. Get Product with Invalid ID
+GET {{baseUrl}}/products/invalid-product-id
+
+### 20. Get Product that Doesn't Exist (valid ID format)
+GET {{baseUrl}}/products/507f1f77bcf86cd799439011
+
+### 21. Create Product with Negative Price
+POST {{baseUrl}}/products
+Content-Type: application/json
+
+{
+  "name": "Invalid Product",
+  "description": "Negative price test",
+  "price": -50,
+  "stock": 10,
+  "owner": "{{userId}}"
+}
+
+
+### ========== ADVANCED QUERIES ==========
+
+### 22. Create Second User and Their Products
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Jane Merchant",
+  "email": "jane.merchant@example.com",
+  "age": 28,
+  "tags": ["seller"]
+}
+# Copy this user's _id to test multiple owners
+
+### 23. Get All Products to See Multiple Owners
+GET {{baseUrl}}/products

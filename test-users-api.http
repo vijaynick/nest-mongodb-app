@@ -1,0 +1,65 @@
+### Variables (optional)
+@baseUrl = http://localhost:3000
+@userId = 
+
+### Create User 1
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Alice Johnson",
+  "email": "alice@example.com",
+  "age": 28,
+  "tags": ["frontend", "react"]
+}
+
+### Create User 2
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Bob Smith",
+  "email": "bob@example.com",
+  "age": 35,
+  "isActive": false,
+  "tags": ["backend", "nodejs"]
+}
+
+### Get All Users
+GET {{baseUrl}}/users
+
+### Get User by ID
+# First run "Create User 1", copy the _id from response, paste it after @userId above
+GET {{baseUrl}}/users/{{userId}}
+
+### Update User
+PATCH {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+
+{
+  "age": 29,
+  "tags": ["frontend", "react", "typescript"]
+}
+
+### Delete User
+DELETE {{baseUrl}}/users/{{userId}}
+
+### Test Invalid Email (should fail)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "not-an-email",
+  "age": 200
+}
+
+### Test Duplicate Email (should fail after first user created)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Duplicate User",
+  "email": "alice@example.com",
+  "age": 30
+}

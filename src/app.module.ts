@@ -1,12 +1,20 @@
-import { Module } from '@nestjs/common';
+import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import databaseConfig from './config/database.config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
 import { ProductsModule } from './modules/products/products.module';
+import { WinstonModule } from 'nest-winston';
+import { winstonConfig } from './config/logger.config';
+import { CustomLoggerService } from './common/logger/custom-logger.service';
+import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware';
 
+@Global() // Add this decorator
 @Module({
   imports: [
+    // Winston Logger Module
+    WinstonModule.forRoot(winstonConfig),
+
     // Configuration Module - loads .env file
     ConfigModule.forRoot({
       isGlobal: true, // Makes ConfigModule available throughout the app
@@ -25,7 +33,12 @@ import { ProductsModule } from './modules/products/products.module';
     UsersModule, // Add Users Module
     ProductsModule, // Add Products Module
   ],
-  controllers: [],
-  providers: [],
+  providers: [CustomLoggerService],
+  exports: [CustomLoggerService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply HTTP logger middleware to all routes
+    consumer.apply(HttpLoggerMiddleware).forRoutes('*');
+  }
+}

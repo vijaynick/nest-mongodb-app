@@ -352,6 +352,13 @@ export class ProductsController {
     return this.productsService.findAll();
   }
 
+  // REMOVE ParseObjectIdPipe - let service handle it
+  @Get('owner/:ownerId')
+  @ApiFilterByField('ownerId', '6941c93806b8bd1830f6f353')
+  findByOwner(@Param('ownerId') ownerId: string) {
+    return this.productsService.findByOwner(ownerId);
+  }
+
   @Get('available')
   @ApiOperation({ summary: 'Get all available products' })
   @ApiResponse({ status: 200, description: 'Returns available products.' })
@@ -375,13 +382,6 @@ export class ProductsController {
       parseFloat(minPrice),
       parseFloat(maxPrice),
     );
-  }
-
-  // REMOVE ParseObjectIdPipe - let service handle it
-  @Get('owner/:ownerId')
-  @ApiFilterByField('ownerId', '6941c93806b8bd1830f6f353')
-  findByOwner(@Param('ownerId') ownerId: string) {
-    return this.productsService.findByOwner(ownerId);
   }
 
   @Get(':id')

@@ -2,9 +2,21 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { CustomLoggerService } from './common/logger/custom-logger.service';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  // Get Winston logger
+  const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
+  app.useLogger(logger);
+
+  // Get custom logger service
+  const customLogger = app.get(CustomLoggerService);
 
   // Global validation pipe for DTOs
   app.useGlobalPipes(
@@ -14,6 +26,9 @@ async function bootstrap() {
       transform: true, // Auto-transform payloads to DTO instances
     }),
   );
+
+  // Global exception filter with logging
+  app.useGlobalFilters(new HttpExceptionFilter(customLogger));
 
   // Enable CORS if needed
   app.enableCors();
@@ -41,7 +56,15 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
+  // Log application start
+  customLogger.log(
+    `🚀 Application is running on: http://localhost:${port}`,
+    'Bootstrap',
+  );
+  customLogger.log(
+    `📚 Swagger docs: http://localhost:${port}/api/docs`,
+    'Bootstrap',
+  );
+  customLogger.log(`📝 Logs directory: ./logs`, 'Bootstrap');
 }
 bootstrap();

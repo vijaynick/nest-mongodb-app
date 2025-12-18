@@ -8,28 +8,40 @@ import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { CreateProductDto, UpdateProductDto } from './dto';
 import { UsersService } from '../users/users.service'; // ← Import UsersService
+import { CustomLoggerService } from 'src/common/logger/custom-logger.service';
+import { BaseService } from 'src/common/base/base.service';
+import { LogBusinessEvent, LogMethod } from 'src/common/decorators';
 
 @Injectable()
-export class ProductsService {
+export class ProductsService extends BaseService {
+  protected readonly serviceName = 'ProductsService';
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     private readonly usersService: UsersService, // ← Inject UsersService
-  ) {}
+    protected readonly logger: CustomLoggerService,
+  ) {
+    super();
+  }
 
   /**
    * Create a new product with owner validation
    */
+  @LogMethod()
+  @LogBusinessEvent('Product Created')
   async create(createProductDto: CreateProductDto): Promise<Product> {
     // Validate ObjectId format
     if (!Types.ObjectId.isValid(createProductDto.owner)) {
+      this.logWarn(`Invalid owner ID format: ${createProductDto.owner}`);
       throw new BadRequestException('Invalid owner ID format');
     }
 
-    // Validate that the owner (user) exists
+    // Validate owner exists
+    this.logDebug(`Validating owner: ${createProductDto.owner}`);
     try {
       await this.usersService.findOne(createProductDto.owner);
     } catch (error) {
       if (error instanceof NotFoundException) {
+        this.logWarn(`Owner not found: ${createProductDto.owner}`);
         throw new BadRequestException(
           `Owner with ID ${createProductDto.owner} does not exist`,
         );
@@ -44,13 +56,22 @@ export class ProductsService {
   /**
    * Find all products with owner details
    */
+  @LogMethod()
   async findAll(): Promise<Product[]> {
-    return this.productModel.find().populate('owner', 'name email').exec();
+    return this.executeQuery('Product.find().populate(owner)', async () => {
+      const products = await this.productModel
+        .find()
+        .populate('owner', 'name email')
+        .exec();
+      this.logInfo(`Found ${products.length} products`);
+      return products;
+    });
   }
 
   /**
    * Find product by ID with owner details
    */
+  @LogMethod()
   async findOne(id: string): Promise<Product> {
     const product = await this.productModel
       .findById(id)
@@ -58,6 +79,7 @@ export class ProductsService {
       .exec();
 
     if (!product) {
+      this.logWarn(`Product not found: ${id}`);
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
@@ -67,61 +89,91 @@ export class ProductsService {
   /**
    * Find products by owner
    */
+  @LogMethod()
   async findByOwner(ownerId: string): Promise<Product[]> {
     if (!Types.ObjectId.isValid(ownerId)) {
+      this.logWarn(`Invalid owner ID: ${ownerId}`);
       throw new BadRequestException('Invalid owner ID');
     }
 
-    // Search with $or to match both ObjectId and String (for legacy data)
-    const products = await this.productModel
-      .find({
-        $or: [
-          { owner: new Types.ObjectId(ownerId) },
-          { owner: ownerId } as any,
-        ],
-      })
-      .populate('owner', 'name email')
-      .exec();
-
-    return products;
+    return this.executeQuery(`Product.find({owner:${ownerId}})`, async () => {
+      const products = await this.productModel
+        .find({
+          $or: [
+            { owner: new Types.ObjectId(ownerId) },
+            { owner: ownerId } as any,
+          ],
+        })
+        .populate('owner', 'name email')
+        .exec();
+      this.logInfo(`Found ${products.length} products for owner ${ownerId}`);
+      return products;
+    });
   }
 
   /**
    * Find available products
    */
+  @LogMethod()
   async findAvailableProducts(): Promise<Product[]> {
-    return this.productModel
-      .find({ isAvailable: true, stock: { $gt: 0 } })
-      .populate('owner', 'name email')
-      .exec();
+    return this.executeQuery('Product.find({isAvailable:true})', async () => {
+      const products = await this.productModel
+        .find({ isAvailable: true, stock: { $gt: 0 } })
+        .populate('owner', 'name email')
+        .exec();
+      this.logInfo(`Found ${products.length} available products`);
+      return products;
+    });
   }
 
   /**
    * Find products by category
    */
+  @LogMethod()
   async findByCategory(category: string): Promise<Product[]> {
-    return this.productModel
-      .find({ categories: category })
-      .populate('owner', 'name email')
-      .exec();
+    return this.executeQuery(
+      `Product.find({category:'${category}'})`,
+      async () => {
+        const products = await this.productModel
+          .find({ categories: category })
+          .populate('owner', 'name email')
+          .exec();
+        this.logInfo(
+          `Found ${products.length} products in category '${category}'`,
+        );
+        return products;
+      },
+    );
   }
 
   /**
    * Find products within price range
    */
+  @LogMethod()
   async findByPriceRange(
     minPrice: number,
     maxPrice: number,
   ): Promise<Product[]> {
-    return this.productModel
-      .find({ price: { $gte: minPrice, $lte: maxPrice } })
-      .populate('owner', 'name email')
-      .exec();
+    return this.executeQuery(
+      `Product.find({price:${minPrice}-${maxPrice}})`,
+      async () => {
+        const products = await this.productModel
+          .find({ price: { $gte: minPrice, $lte: maxPrice } })
+          .populate('owner', 'name email')
+          .exec();
+        this.logInfo(
+          `Found ${products.length} products in price range $${minPrice}-$${maxPrice}`,
+        );
+        return products;
+      },
+    );
   }
 
   /**
    * Update product by ID
    */
+  @LogMethod()
+  @LogBusinessEvent('Product Updated')
   async update(
     id: string,
     updateProductDto: UpdateProductDto,
@@ -132,6 +184,7 @@ export class ProductsService {
       .exec();
 
     if (!updatedProduct) {
+      this.logWarn(`Product not found for update: ${id}`);
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
@@ -141,9 +194,13 @@ export class ProductsService {
   /**
    * Delete product by ID
    */
+  @LogMethod()
+  @LogBusinessEvent('Product Deleted')
   async remove(id: string): Promise<void> {
     const result = await this.productModel.findByIdAndDelete(id).exec();
+
     if (!result) {
+      this.logWarn(`Product not found for deletion: ${id}`);
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
   }
@@ -152,56 +209,93 @@ export class ProductsService {
    * Update stock quantity
    */
   async updateStock(id: string, quantity: number): Promise<Product> {
-    const product = await this.productModel.findById(id).exec();
+    return this.executeWithLogging(
+      'updateStock',
+      async () => {
+        const product = await this.productModel.findById(id).exec();
 
-    if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
-    }
+        if (!product) {
+          throw new NotFoundException(`Product with ID ${id} not found`);
+        }
 
-    product.stock = quantity;
-    product.isAvailable = quantity > 0;
+        const oldStock = product.stock;
+        product.stock = quantity;
+        product.isAvailable = quantity > 0;
 
-    return await product.save();
+        const updated = await product.save();
+
+        // Stock warnings
+        if (quantity === 0) {
+          this.logWarn(`⚠️  Out of stock: ${product.name} (ID: ${id})`);
+        } else if (quantity > 0 && quantity <= 5) {
+          this.logWarn(
+            `⚠️  Low stock: ${product.name} has only ${quantity} units`,
+          );
+        }
+
+        this.logEvent('Stock Updated', {
+          productId: id,
+          productName: product.name,
+          oldStock,
+          newStock: quantity,
+          isAvailable: updated.isAvailable,
+        });
+
+        return updated;
+      },
+      { id, quantity },
+    );
   }
 
   /**
    * MIGRATION: Convert owner strings to ObjectIds
    */
   async migrateOwnersToObjectId(): Promise<any> {
-    const products = await this.productModel.find().exec();
+    return this.executeWithLogging('migrateOwners', async () => {
+      const products = await this.productModel.find().exec();
+      this.logInfo(`Starting migration for ${products.length} products`);
 
-    let migrated = 0;
-    let failed = 0;
+      let migrated = 0;
+      let skipped = 0;
+      let failed = 0;
 
-    for (const product of products) {
-      try {
-        if (typeof product.owner === 'string') {
-          console.log(`Migrating product: ${product.name}`);
-          product.owner = new Types.ObjectId(product.owner) as any;
-          await product.save();
-          migrated++;
+      for (const product of products) {
+        try {
+          if (typeof product.owner === 'string') {
+            product.owner = new Types.ObjectId(product.owner) as any;
+            await product.save();
+            migrated++;
+          } else {
+            skipped++;
+          }
+        } catch (error) {
+          failed++;
+          this.logWarn(`Failed to migrate: ${product.name}`);
         }
-      } catch (error) {
-        console.error(`Failed to migrate product ${product.name}:`, error);
-        failed++;
       }
-    }
 
-    return {
-      success: true,
-      migrated,
-      failed,
-      message: `Successfully migrated ${migrated} products. Failed: ${failed}`,
-    };
+      const result = {
+        success: true,
+        total: products.length,
+        migrated,
+        skipped,
+        failed,
+        message: `Migrated ${migrated}, skipped ${skipped}, failed ${failed}`,
+      };
+
+      this.logEvent('Migration Complete', result);
+      return result;
+    });
   }
-
   /**
    * DEBUG: Check all products and their owner types
    */
   async debugCheckOwners(): Promise<any> {
-    const allProducts = await this.productModel.find().lean().exec();
+    this.logDebug('Running owner type check');
 
-    return allProducts.map((p) => ({
+    const products = await this.productModel.find().lean().exec();
+    return products.map((p) => ({
+      id: p._id,
       name: p.name,
       owner: p.owner,
       ownerType: typeof p.owner,
